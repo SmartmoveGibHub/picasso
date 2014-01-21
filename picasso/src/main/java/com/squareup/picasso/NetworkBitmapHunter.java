@@ -93,7 +93,7 @@ class NetworkBitmapHunter extends BitmapHunter {
         options.inJustDecodeBounds = true;
 
         BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options);
-        calculateInSampleSize(data.targetWidth, data.targetHeight, options);
+        calculateInSampleSize(data.maxWidth, data.maxHeight, data.targetWidth, data.targetHeight, options);
       }
       return BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options);
     } else {
@@ -103,7 +103,7 @@ class NetworkBitmapHunter extends BitmapHunter {
         options.inJustDecodeBounds = true;
 
         BitmapFactory.decodeStream(stream, null, options);
-        calculateInSampleSize(data.targetWidth, data.targetHeight, options);
+        calculateInSampleSize(data.maxWidth, data.maxHeight, data.targetWidth, data.targetHeight, options);
 
         markStream.reset(mark);
       }

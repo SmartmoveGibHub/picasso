@@ -58,7 +58,7 @@ class MediaStoreBitmapHunter extends ContentStreamBitmapHunter {
       BitmapFactory.Options options = new BitmapFactory.Options();
       options.inJustDecodeBounds = true;
 
-      calculateInSampleSize(data.targetWidth, data.targetHeight, picassoKind.width,
+      calculateInSampleSize(data.maxWidth, data.maxHeight, data.targetWidth, data.targetHeight, picassoKind.width,
           picassoKind.height, options);
 
       Bitmap result = getThumbnail(contentResolver, id, picassoKind.androidKind, options);

@@ -111,11 +111,22 @@ final class Utils {
       builder.append("resize:").append(data.targetWidth).append('x').append(data.targetHeight);
       builder.append('\n');
     }
+      if (data.maxWidth != 0) {
+          builder.append("maxWidth:").append(data.maxWidth);
+          builder.append('\n');
+      }
+      if (data.maxHeight != 0) {
+          builder.append("maxHeight:").append(data.maxHeight);
+          builder.append('\n');
+      }
     if (data.centerCrop) {
       builder.append("centerCrop\n");
     } else if (data.centerInside) {
       builder.append("centerInside\n");
+    } else if (data.topCrop) {
+        builder.append("topCrop\n");
     }
+
 
     if (data.transformations != null) {
       //noinspection ForLoopReplaceableByForEach

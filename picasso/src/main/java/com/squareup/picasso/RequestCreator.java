@@ -138,6 +138,12 @@ public class RequestCreator {
         return this;
     }
 
+    public RequestCreator setMaxSize(int maxWidth, int maxHeight) {
+        data.setMaxSize(maxWidth, maxHeight);
+        return this;
+    }
+
+
     /**
      * Crops an image inside of the bounds specified by {@link #resize(int, int)} rather than
      * distorting the aspect ratio. This cropping technique scales the image so that it fills the

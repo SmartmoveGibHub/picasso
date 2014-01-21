@@ -219,17 +219,42 @@ abstract class BitmapHunter implements Runnable {
         }
     }
 
-    static void calculateInSampleSize(int reqWidth, int reqHeight, BitmapFactory.Options options) {
-        calculateInSampleSize(reqWidth, reqHeight, options.outWidth, options.outHeight, options);
+    static void calculateInSampleSize(int maxWidth, int maxHeight, int reqWidth, int reqHeight, BitmapFactory.Options options) {
+        calculateInSampleSize(maxWidth, maxHeight, reqWidth, reqHeight, options.outWidth, options.outHeight, options);
     }
 
-    static void calculateInSampleSize(int reqWidth, int reqHeight, int width, int height,
+    static void calculateInSampleSize(int maxWidth, int maxHeight, int reqWidth, int reqHeight, int width, int height,
                                       BitmapFactory.Options options) {
         int sampleSize = 1;
-        if (height > reqHeight || width > reqWidth) {
-            final int heightRatio = Math.round((float) height / (float) reqHeight);
-            final int widthRatio = Math.round((float) width / (float) reqWidth);
-            sampleSize = heightRatio < widthRatio ? heightRatio : widthRatio;
+        if(reqWidth != 0)
+        {
+            if (height > reqHeight || width > reqWidth) {
+                final int heightRatio = Math.round((float) height / (float) reqHeight);
+                final int widthRatio = Math.round((float) width / (float) reqWidth);
+                sampleSize = heightRatio < widthRatio ? heightRatio : widthRatio;
+            }
+        }
+        else
+        {
+            int targetWidth;
+            int targetHeight;
+
+            float ratioWidthHeight = width / (float)height;
+            if(maxWidth > (maxHeight * ratioWidthHeight))
+            {
+                targetWidth = maxWidth;
+                targetHeight = (int)(maxWidth / ratioWidthHeight);
+            }
+            else
+            {
+                targetWidth = (int)(maxHeight * ratioWidthHeight);
+                targetHeight = maxHeight;
+            }
+            if (height > targetHeight || width > targetWidth) {
+                final int heightRatio = Math.round((float) height / (float) targetHeight);
+                final int widthRatio = Math.round((float) width / (float) targetWidth);
+                sampleSize = heightRatio < widthRatio ? heightRatio : widthRatio;
+            }
         }
 
         options.inSampleSize = sampleSize;
@@ -299,8 +324,25 @@ abstract class BitmapHunter implements Runnable {
         Matrix matrix = new Matrix();
 
         if (data.needsMatrixTransform()) {
-            int targetWidth = data.targetWidth;
-            int targetHeight = data.targetHeight;
+            int targetWidth;
+            int targetHeight;
+            if(data.targetWidth != 0) {
+                targetWidth = data.targetWidth;
+                targetHeight = data.targetHeight;
+            }
+            else {
+                float ratioWidthHeight = inWidth / (float)inHeight;
+                if(data.maxWidth > (data.maxHeight * ratioWidthHeight))
+                {
+                    targetWidth = data.maxWidth;
+                    targetHeight = (int)(data.maxWidth / ratioWidthHeight);
+                }
+                else
+                {
+                    targetWidth = (int)(data.maxHeight * ratioWidthHeight);
+                    targetHeight = data.maxHeight;
+                }
+            }
 
             float targetRotation = data.rotationDegrees;
             if (targetRotation != 0) {

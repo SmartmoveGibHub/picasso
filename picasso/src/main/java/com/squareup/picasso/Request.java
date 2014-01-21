@@ -42,6 +42,10 @@ public final class Request {
     public final int targetWidth;
     /** Target image height for resizing. */
     public final int targetHeight;
+
+    public final int maxWidth;
+    public final int maxHeight;
+
     /**
      * True if the final image should use the 'centerCrop' scale technique.
      * <p>
@@ -70,7 +74,8 @@ public final class Request {
     public final boolean hasRotationPivot;
 
     private Request(Uri uri, int resourceId, List<Transformation> transformations, int targetWidth,
-                    int targetHeight, boolean centerCrop, boolean centerInside, boolean topCrop, float rotationDegrees,
+                    int targetHeight, int maxWidth, int maxHeight,
+                    boolean centerCrop, boolean centerInside, boolean topCrop, float rotationDegrees,
                     float rotationPivotX, float rotationPivotY, boolean hasRotationPivot) {
         this.uri = uri;
         this.resourceId = resourceId;
@@ -81,6 +86,8 @@ public final class Request {
         }
         this.targetWidth = targetWidth;
         this.targetHeight = targetHeight;
+        this.maxWidth = maxWidth;
+        this.maxHeight = maxHeight;
         this.centerCrop = centerCrop;
         this.centerInside = centerInside;
         this.topCrop = topCrop;
@@ -98,7 +105,7 @@ public final class Request {
     }
 
     public boolean hasSize() {
-        return targetWidth != 0;
+        return targetWidth != 0 || maxHeight != 0 || maxWidth != 0;
     }
 
     boolean needsTransformation() {
@@ -106,7 +113,7 @@ public final class Request {
     }
 
     boolean needsMatrixTransform() {
-        return targetWidth != 0 || rotationDegrees != 0;
+        return targetWidth != 0 || rotationDegrees != 0 || maxWidth != 0 || maxHeight != 0;
     }
 
     boolean hasCustomTransformations() {
@@ -123,6 +130,8 @@ public final class Request {
         private int resourceId;
         private int targetWidth;
         private int targetHeight;
+        private int maxWidth;
+        private int maxHeight;
         private boolean centerCrop;
         private boolean topCrop;
         private boolean centerInside;
@@ -152,6 +161,8 @@ public final class Request {
             resourceId = request.resourceId;
             targetWidth = request.targetWidth;
             targetHeight = request.targetHeight;
+            maxWidth = request.maxWidth;
+            maxHeight = request.maxHeight;
             centerCrop = request.centerCrop;
             topCrop = request.topCrop;
             centerInside = request.centerInside;
@@ -213,12 +224,25 @@ public final class Request {
             return this;
         }
 
+        /** Resize the image to the specified size in pixels. */
+        public Builder setMaxSize(int maxWidth, int maxHeight) {
+            if (maxWidth <= 0 && maxHeight <= 0) {
+                throw new IllegalArgumentException("Width or Height must be positive number.");
+            }
+            this.maxHeight = maxHeight;
+            this.maxWidth = maxWidth;
+            return this;
+        }
+
         /** Clear the resize transformation, if any. This will also clear center crop/inside if set. */
         public Builder clearResize() {
             targetWidth = 0;
             targetHeight = 0;
+            maxWidth = 0;
+            maxHeight = 0;
             centerCrop = false;
             centerInside = false;
+            topCrop = false;
             return this;
         }
 
@@ -317,16 +341,16 @@ public final class Request {
             if ((centerInside && centerCrop) || (topCrop && centerCrop) || (topCrop && centerInside)) {
                 throw new IllegalStateException("Center crop, center inside and top crop can not be used together.");
             }
-            if (centerCrop && targetWidth == 0) {
+            if (centerCrop && targetWidth == 0 && maxWidth == 0 && maxHeight == 0) {
                 throw new IllegalStateException("Center crop requires calling resize.");
             }
-            if (centerInside && targetWidth == 0) {
+            if (centerInside && targetWidth == 0 && maxWidth == 0 && maxHeight == 0) {
                 throw new IllegalStateException("Center inside requires calling resize.");
             }
-            if (topCrop && targetWidth == 0) {
+            if (topCrop && targetWidth == 0 && maxWidth == 0 && maxHeight == 0) {
                 throw new IllegalStateException("Top crop requires calling resize.");
             }
-            return new Request(uri, resourceId, transformations, targetWidth, targetHeight, centerCrop,
+            return new Request(uri, resourceId, transformations, targetWidth, targetHeight, maxWidth, maxHeight, centerCrop,
                     centerInside, topCrop, rotationDegrees, rotationPivotX, rotationPivotY, hasRotationPivot);
         }
     }
