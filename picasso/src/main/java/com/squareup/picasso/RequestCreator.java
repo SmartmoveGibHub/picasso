@@ -138,6 +138,7 @@ public class RequestCreator {
         return this;
     }
 
+    /** Resize the image give the specified maxWidth and/or maxHeight in pixels. */
     public RequestCreator setMaxSize(int maxWidth, int maxHeight) {
         data.setMaxSize(maxWidth, maxHeight);
         return this;
