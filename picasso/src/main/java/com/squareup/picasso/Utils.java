@@ -26,6 +26,7 @@ import android.os.Looper;
 import android.os.Process;
 import android.os.StatFs;
 import android.provider.Settings;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -177,12 +178,12 @@ final class Utils {
   }
 
   static Downloader createDefaultDownloader(Context context) {
-    try {
-      Class.forName("com.squareup.okhttp.OkHttpClient");
-      return OkHttpLoaderCreator.create(context);
-    } catch (ClassNotFoundException e) {
+//    try {
+//      Class.forName("com.squareup.okhttp.OkHttpClient");
+//      return OkHttpLoaderCreator.create(context);
+//    } catch (ClassNotFoundException e) {
       return new UrlConnectionDownloader(context);
-    }
+//    }
   }
 
   static File createDefaultCacheDir(Context context) {
@@ -325,9 +326,9 @@ final class Utils {
     }
   }
 
-  private static class OkHttpLoaderCreator {
-    static Downloader create(Context context) {
-      return new OkHttpDownloader(context);
-    }
-  }
+//  private static class OkHttpLoaderCreator {
+//    static Downloader create(Context context) {
+//      return new OkHttpDownloader(context);
+//    }
+//  }
 }
