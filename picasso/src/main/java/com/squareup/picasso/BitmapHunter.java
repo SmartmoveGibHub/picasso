@@ -438,6 +438,21 @@ abstract class BitmapHunter implements Runnable {
         float heightRatio = targetHeight / (float) inHeight;
         float scale = widthRatio < heightRatio ? widthRatio : heightRatio;
         matrix.preScale(scale, scale);
+      } else if (data.topCrop) {
+          float widthRatio = targetWidth / (float) inWidth;
+          float heightRatio = targetHeight / (float) inHeight;
+          float scale;
+          if (widthRatio > heightRatio) {
+              scale = widthRatio;
+              int newSize = (int) Math.ceil(inHeight * (heightRatio / widthRatio));
+              drawHeight = newSize;
+          } else {
+              scale = heightRatio;
+              int newSize = (int) Math.ceil(inWidth * (widthRatio / heightRatio));
+              drawWidth = newSize;
+          }
+          matrix.preScale(scale, scale);
+
       } else if (targetWidth != 0 && targetHeight != 0 //
           && (targetWidth != inWidth || targetHeight != inHeight)) {
         // If an explicit target size has been specified and they do not match the results bounds,

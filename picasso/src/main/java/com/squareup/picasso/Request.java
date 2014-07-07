@@ -62,6 +62,14 @@ public final class Request {
    * This is mutually exclusive with {@link #centerCrop}.
    */
   public final boolean centerInside;
+
+    /**
+     * True if the final image should use the 'topCrop' scale technique.
+     * <p>
+     * This is mutually exclusive with {@link #centerCrop}.
+     */
+  public final boolean topCrop;
+
   /** Amount to rotate the image in degrees. */
   public final float rotationDegrees;
   /** Rotation pivot on the X axis. */
@@ -74,7 +82,7 @@ public final class Request {
   public final Bitmap.Config config;
 
   private Request(Uri uri, int resourceId, List<Transformation> transformations, int targetWidth,
-      int targetHeight, boolean centerCrop, boolean centerInside, float rotationDegrees,
+      int targetHeight, boolean centerCrop, boolean centerInside, boolean topCrop, float rotationDegrees,
       float rotationPivotX, float rotationPivotY, boolean hasRotationPivot, Bitmap.Config config) {
     this.uri = uri;
     this.resourceId = resourceId;
@@ -86,6 +94,7 @@ public final class Request {
     this.targetWidth = targetWidth;
     this.targetHeight = targetHeight;
     this.centerCrop = centerCrop;
+    this.topCrop = topCrop;
     this.centerInside = centerInside;
     this.rotationDegrees = rotationDegrees;
     this.rotationPivotX = rotationPivotX;
@@ -111,6 +120,9 @@ public final class Request {
     }
     if (centerCrop) {
       sb.append(" centerCrop");
+    }
+    if (topCrop) {
+        sb.append(" topCrop");
     }
     if (centerInside) {
       sb.append(" centerInside");
@@ -175,6 +187,7 @@ public final class Request {
     private int resourceId;
     private int targetWidth;
     private int targetHeight;
+    private boolean topCrop;
     private boolean centerCrop;
     private boolean centerInside;
     private float rotationDegrees;
@@ -205,6 +218,7 @@ public final class Request {
       targetWidth = request.targetWidth;
       targetHeight = request.targetHeight;
       centerCrop = request.centerCrop;
+      topCrop = request.topCrop;
       centerInside = request.centerInside;
       rotationDegrees = request.rotationDegrees;
       rotationPivotX = request.rotationPivotX;
@@ -270,40 +284,54 @@ public final class Request {
       targetWidth = 0;
       targetHeight = 0;
       centerCrop = false;
+      topCrop = false;
       centerInside = false;
       return this;
     }
 
-    /**
-     * Crops an image inside of the bounds specified by {@link #resize(int, int)} rather than
-     * distorting the aspect ratio. This cropping technique scales the image so that it fills the
-     * requested bounds and then crops the extra.
-     */
-    public Builder centerCrop() {
-      if (centerInside) {
-        throw new IllegalStateException("Center crop can not be used after calling centerInside");
+      /**
+       * Crops an image inside of the bounds specified by {@link #resize(int, int)} rather than
+       * distorting the aspect ratio. This cropping technique scales the image so that it fills the
+       * requested bounds and then crops the extra.
+       */
+      public Builder centerCrop() {
+          if (centerInside || topCrop) {
+              throw new IllegalStateException("Center crop can not be used after calling centerInside");
+          }
+          centerCrop = true;
+          return this;
       }
-      centerCrop = true;
-      return this;
-    }
 
-    /** Clear the center crop transformation flag, if set. */
-    public Builder clearCenterCrop() {
-      centerCrop = false;
-      return this;
-    }
-
-    /**
-     * Centers an image inside of the bounds specified by {@link #resize(int, int)}. This scales
-     * the image so that both dimensions are equal to or less than the requested bounds.
-     */
-    public Builder centerInside() {
-      if (centerCrop) {
-        throw new IllegalStateException("Center inside can not be used after calling centerCrop");
+      /**
+       * Crops an image inside of the bounds specified by {@link #resize(int, int)} rather than
+       * distorting the aspect ratio. This cropping technique scales the image so that it fills the
+       * requested bounds and then crops the extra.
+       */
+      public Builder topCrop() {
+          if (centerInside || centerCrop) {
+              throw new IllegalStateException("Center crop can not be used after calling centerInside");
+          }
+          topCrop = true;
+          return this;
       }
-      centerInside = true;
-      return this;
-    }
+
+      /** Clear the center crop transformation flag, if set. */
+      public Builder clearCenterCrop() {
+          centerCrop = false;
+          return this;
+      }
+
+      /**
+       * Centers an image inside of the bounds specified by {@link #resize(int, int)}. This scales
+       * the image so that both dimensions are equal to or less than the requested bounds.
+       */
+      public Builder centerInside() {
+          if (centerCrop || topCrop) {
+              throw new IllegalStateException("Center inside can not be used after calling centerCrop");
+          }
+          centerInside = true;
+          return this;
+      }
 
     /** Clear the center inside transformation flag, if set. */
     public Builder clearCenterInside() {
@@ -369,7 +397,7 @@ public final class Request {
         throw new IllegalStateException("Center inside requires calling resize.");
       }
       return new Request(uri, resourceId, transformations, targetWidth, targetHeight, centerCrop,
-          centerInside, rotationDegrees, rotationPivotX, rotationPivotY, hasRotationPivot, config);
+          centerInside, topCrop, rotationDegrees, rotationPivotX, rotationPivotY, hasRotationPivot, config);
     }
   }
 }
