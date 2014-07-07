@@ -15,7 +15,7 @@ class AssetBitmapHunter extends BitmapHunter {
   private static final int ASSET_PREFIX_LENGTH =
       (SCHEME_FILE + ":///" + ANDROID_ASSET + "/").length();
 
-  private AssetManager assetManager;
+  private final AssetManager assetManager;
 
   public AssetBitmapHunter(Context context, Picasso picasso, Dispatcher dispatcher, Cache cache,
       Stats stats, Action action) {
@@ -33,9 +33,8 @@ class AssetBitmapHunter extends BitmapHunter {
   }
 
   Bitmap decodeAsset(String filePath) throws IOException {
-    BitmapFactory.Options options = createBitmapOptions(data);
-    if (data.hasSize()) {
-      options.inJustDecodeBounds = true;
+    final BitmapFactory.Options options = createBitmapOptions(data);
+    if (requiresInSampleSize(options)) {
       InputStream is = null;
       try {
         is = assetManager.open(filePath);
@@ -43,7 +42,7 @@ class AssetBitmapHunter extends BitmapHunter {
       } finally {
         Utils.closeQuietly(is);
       }
-      calculateInSampleSize(data.maxWidth, data.maxHeight, data.targetWidth, data.targetHeight, options);
+      calculateInSampleSize(data.targetWidth, data.targetHeight, options);
     }
     InputStream is = assetManager.open(filePath);
     try {

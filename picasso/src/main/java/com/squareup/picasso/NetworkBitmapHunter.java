@@ -56,6 +56,18 @@ class NetworkBitmapHunter extends BitmapHunter {
     }
 
     InputStream is = response.getInputStream();
+    if (is == null) {
+      return null;
+    }
+    // Sometimes response content length is zero when requests are being replayed. Haven't found
+    // root cause to this but retrying the request seems safe to do so.
+    if (response.getContentLength() == 0) {
+      Utils.closeQuietly(is);
+      throw new IOException("Received response with 0 content-length header.");
+    }
+    if (loadedFrom == NETWORK && response.getContentLength() > 0) {
+      stats.dispatchDownloadFinished(response.getContentLength());
+    }
     try {
       return decodeStream(is, data);
     } finally {
@@ -69,17 +81,21 @@ class NetworkBitmapHunter extends BitmapHunter {
       return false;
     }
     retryCount--;
-    return info == null || info.isConnectedOrConnecting();
+    return info == null || info.isConnected();
+  }
+
+  @Override boolean supportsReplay() {
+    return true;
   }
 
   private Bitmap decodeStream(InputStream stream, Request data) throws IOException {
-    if (stream == null) {
-      return null;
-    }
     MarkableInputStream markStream = new MarkableInputStream(stream);
     stream = markStream;
 
     long mark = markStream.savePosition(MARKER);
+
+    final BitmapFactory.Options options = createBitmapOptions(data);
+    final boolean calculateSize = requiresInSampleSize(options);
 
     boolean isWebPFile = Utils.isWebPFile(stream);
     markStream.reset(mark);
@@ -87,25 +103,24 @@ class NetworkBitmapHunter extends BitmapHunter {
     // Decode byte array instead
     if (isWebPFile) {
       byte[] bytes = Utils.toByteArray(stream);
-      BitmapFactory.Options options = createBitmapOptions(data);
-      if (data.hasSize()) {
-        options.inJustDecodeBounds = true;
-
+      if (calculateSize) {
         BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options);
-        calculateInSampleSize(data.maxWidth, data.maxHeight, data.targetWidth, data.targetHeight, options);
+        calculateInSampleSize(data.targetWidth, data.targetHeight, options);
       }
       return BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options);
     } else {
-      BitmapFactory.Options options = createBitmapOptions(data);
-      if (data.hasSize()) {
-        options.inJustDecodeBounds = true;
-
+      if (calculateSize) {
         BitmapFactory.decodeStream(stream, null, options);
-        calculateInSampleSize(data.maxWidth, data.maxHeight, data.targetWidth, data.targetHeight, options);
+        calculateInSampleSize(data.targetWidth, data.targetHeight, options);
 
         markStream.reset(mark);
       }
-      return BitmapFactory.decodeStream(stream, null, options);
+      Bitmap bitmap = BitmapFactory.decodeStream(stream, null, options);
+      if (bitmap == null) {
+        // Treat null as an IO exception, we will eventually retry.
+        throw new IOException("Failed to decode stream.");
+      }
+      return bitmap;
     }
   }
 }

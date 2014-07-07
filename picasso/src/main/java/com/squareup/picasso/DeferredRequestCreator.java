@@ -18,12 +18,17 @@ package com.squareup.picasso;
 import android.view.ViewTreeObserver;
 import android.widget.ImageView;
 import java.lang.ref.WeakReference;
+import org.jetbrains.annotations.TestOnly;
 
 class DeferredRequestCreator implements ViewTreeObserver.OnPreDrawListener {
 
   final RequestCreator creator;
   final WeakReference<ImageView> target;
   Callback callback;
+
+  @TestOnly DeferredRequestCreator(RequestCreator creator, ImageView target) {
+    this(creator, target, null);
+  }
 
   DeferredRequestCreator(RequestCreator creator, ImageView target, Callback callback) {
     this.creator = creator;
@@ -42,8 +47,8 @@ class DeferredRequestCreator implements ViewTreeObserver.OnPreDrawListener {
       return true;
     }
 
-    int width = target.getMeasuredWidth();
-    int height = target.getMeasuredHeight();
+    int width = target.getWidth();
+    int height = target.getHeight();
 
     if (width <= 0 || height <= 0) {
       return true;

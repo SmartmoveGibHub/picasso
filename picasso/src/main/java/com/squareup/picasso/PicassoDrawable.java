@@ -16,7 +16,6 @@
 package com.squareup.picasso;
 
 import android.content.Context;
-import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.ColorFilter;
@@ -27,16 +26,16 @@ import android.graphics.Rect;
 import android.graphics.drawable.AnimationDrawable;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.os.SystemClock;
 import android.widget.ImageView;
 
 import static android.graphics.Color.WHITE;
 import static com.squareup.picasso.Picasso.LoadedFrom.MEMORY;
 
-final class PicassoDrawable extends Drawable {
+final class PicassoDrawable extends BitmapDrawable {
   // Only accessed from main thread.
   private static final Paint DEBUG_PAINT = new Paint();
-
   private static final float FADE_DURATION = 200f; //ms
 
   /**
@@ -50,7 +49,7 @@ final class PicassoDrawable extends Drawable {
       ((AnimationDrawable) placeholder).stop();
     }
     PicassoDrawable drawable =
-        new PicassoDrawable(context, placeholder, bitmap, loadedFrom, noFade, debugging);
+        new PicassoDrawable(context, bitmap, placeholder, loadedFrom, noFade, debugging);
     target.setImageDrawable(drawable);
   }
 
@@ -72,7 +71,6 @@ final class PicassoDrawable extends Drawable {
   private final boolean debugging;
   private final float density;
   private final Picasso.LoadedFrom loadedFrom;
-  final BitmapDrawable image;
 
   Drawable placeholder;
 
@@ -80,16 +78,14 @@ final class PicassoDrawable extends Drawable {
   boolean animating;
   int alpha = 0xFF;
 
-  PicassoDrawable(Context context, Drawable placeholder, Bitmap bitmap,
+  PicassoDrawable(Context context, Bitmap bitmap, Drawable placeholder,
       Picasso.LoadedFrom loadedFrom, boolean noFade, boolean debugging) {
-    Resources res = context.getResources();
+    super(context.getResources(), bitmap);
 
     this.debugging = debugging;
-    this.density = res.getDisplayMetrics().density;
+    this.density = context.getResources().getDisplayMetrics().density;
 
     this.loadedFrom = loadedFrom;
-
-    this.image = new BitmapDrawable(res, bitmap);
 
     boolean fade = loadedFrom != MEMORY && !noFade;
     if (fade) {
@@ -101,23 +97,25 @@ final class PicassoDrawable extends Drawable {
 
   @Override public void draw(Canvas canvas) {
     if (!animating) {
-      image.draw(canvas);
+      super.draw(canvas);
     } else {
       float normalized = (SystemClock.uptimeMillis() - startTimeMillis) / FADE_DURATION;
       if (normalized >= 1f) {
         animating = false;
         placeholder = null;
-        image.draw(canvas);
+        super.draw(canvas);
       } else {
         if (placeholder != null) {
           placeholder.draw(canvas);
         }
 
         int partialAlpha = (int) (alpha * normalized);
-        image.setAlpha(partialAlpha);
-        image.draw(canvas);
-        image.setAlpha(alpha);
-        invalidateSelf();
+        super.setAlpha(partialAlpha);
+        super.draw(canvas);
+        super.setAlpha(alpha);
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.GINGERBREAD_MR1) {
+          invalidateSelf();
+        }
       }
     }
 
@@ -126,40 +124,26 @@ final class PicassoDrawable extends Drawable {
     }
   }
 
-  @Override public int getIntrinsicWidth() {
-    return image.getIntrinsicWidth();
-  }
-
-  @Override public int getIntrinsicHeight() {
-    return image.getIntrinsicHeight();
-  }
-
   @Override public void setAlpha(int alpha) {
     this.alpha = alpha;
     if (placeholder != null) {
       placeholder.setAlpha(alpha);
     }
-    image.setAlpha(alpha);
+    super.setAlpha(alpha);
   }
 
   @Override public void setColorFilter(ColorFilter cf) {
     if (placeholder != null) {
       placeholder.setColorFilter(cf);
     }
-    image.setColorFilter(cf);
-  }
-
-  @Override public int getOpacity() {
-    return image.getOpacity();
+    super.setColorFilter(cf);
   }
 
   @Override protected void onBoundsChange(Rect bounds) {
-    super.onBoundsChange(bounds);
-
-    image.setBounds(bounds);
     if (placeholder != null) {
       placeholder.setBounds(bounds);
     }
+    super.onBoundsChange(bounds);
   }
 
   private void drawDebugIndicator(Canvas canvas) {

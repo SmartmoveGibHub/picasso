@@ -15,22 +15,65 @@
  */
 package com.squareup.picasso;
 
+import android.app.Notification;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.widget.ImageView;
-
+import android.widget.RemoteViews;
 import java.io.IOException;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.jetbrains.annotations.TestOnly;
 
 import static com.squareup.picasso.BitmapHunter.forRequest;
 import static com.squareup.picasso.Picasso.LoadedFrom.MEMORY;
+import static com.squareup.picasso.PicassoDrawable.setBitmap;
+import static com.squareup.picasso.PicassoDrawable.setPlaceholder;
+import static com.squareup.picasso.RemoteViewsAction.AppWidgetAction;
+import static com.squareup.picasso.RemoteViewsAction.NotificationAction;
+import static com.squareup.picasso.Utils.OWNER_MAIN;
+import static com.squareup.picasso.Utils.VERB_CHANGED;
+import static com.squareup.picasso.Utils.VERB_COMPLETED;
+import static com.squareup.picasso.Utils.VERB_CREATED;
+import static com.squareup.picasso.Utils.checkMain;
 import static com.squareup.picasso.Utils.checkNotMain;
 import static com.squareup.picasso.Utils.createKey;
+import static com.squareup.picasso.Utils.isMain;
+import static com.squareup.picasso.Utils.log;
 
 /** Fluent API for building an image download request. */
 @SuppressWarnings("UnusedDeclaration") // Public API.
 public class RequestCreator {
+  private static int nextId = 0;
+
+  private static int getRequestId() {
+    if (isMain()) {
+      return nextId++;
+    }
+
+    final CountDownLatch latch = new CountDownLatch(1);
+    final AtomicInteger id = new AtomicInteger();
+    Picasso.HANDLER.post(new Runnable() {
+      @Override public void run() {
+        id.set(getRequestId());
+        latch.countDown();
+      }
+    });
+    try {
+      latch.await();
+    } catch (final InterruptedException e) {
+      Picasso.HANDLER.post(new Runnable() {
+        @Override public void run() {
+          throw new RuntimeException(e);
+        }
+      });
+    }
+    return id.get();
+  }
+
   private final Picasso picasso;
   private final Request.Builder data;
 
@@ -38,8 +81,8 @@ public class RequestCreator {
   private boolean noFade;
   private boolean deferred;
   private int placeholderResId;
-  private Drawable placeholderDrawable;
   private int errorResId;
+  private Drawable placeholderDrawable;
   private Drawable errorDrawable;
 
   RequestCreator(Picasso picasso, Uri uri, int resourceId) {
@@ -49,6 +92,11 @@ public class RequestCreator {
     }
     this.picasso = picasso;
     this.data = new Request.Builder(uri, resourceId);
+  }
+
+  @TestOnly RequestCreator() {
+    this.picasso = null;
+    this.data = new Request.Builder(null, 0);
   }
 
   /**
@@ -109,8 +157,8 @@ public class RequestCreator {
 
   /**
    * Attempt to resize the image to fit exactly into the target {@link ImageView}'s bounds. This
-   * will result in delayed execution of the request until the {@link ImageView} has been measured.
-   * <p/>
+   * will result in delayed execution of the request until the {@link ImageView} has been laid out.
+   * <p>
    * <em>Note:</em> This method works only when your target is an {@link ImageView}.
    */
   public RequestCreator fit() {
@@ -118,11 +166,11 @@ public class RequestCreator {
     return this;
   }
 
-    /** Internal use only. Used by {@link DeferredRequestCreator}. */
-    RequestCreator unfit() {
-        deferred = false;
-        return this;
-    }
+  /** Internal use only. Used by {@link DeferredRequestCreator}. */
+  RequestCreator unfit() {
+    deferred = false;
+    return this;
+  }
 
   /** Resize the image to the specified dimension size. */
   public RequestCreator resizeDimen(int targetWidthResId, int targetHeightResId) {
@@ -138,34 +186,15 @@ public class RequestCreator {
     return this;
   }
 
-    /** Resize the image give the specified maxWidth and/or maxHeight in pixels. */
-    public RequestCreator setMaxSize(int maxWidth, int maxHeight) {
-        data.setMaxSize(maxWidth, maxHeight);
-        return this;
-    }
-
-
-    /**
-     * Crops an image inside of the bounds specified by {@link #resize(int, int)} rather than
-     * distorting the aspect ratio. This cropping technique scales the image so that it fills the
-     * requested bounds, it positions the image so that the top left corner of the bounds is the
-     * top left corner of the image and then crops the extra.
-     */
-    public RequestCreator topCrop() {
-        data.topCrop();
-        return this;
-    }
-
-    /**
-     * Crops an image inside of the bounds specified by {@link #resize(int, int)} rather than
-     * distorting the aspect ratio. This cropping technique scales the image so that it fills the
-     * requested bounds and then crops the extra.
-     */
-    public RequestCreator centerCrop() {
-        data.centerCrop();
-        return this;
-    }
-
+  /**
+   * Crops an image inside of the bounds specified by {@link #resize(int, int)} rather than
+   * distorting the aspect ratio. This cropping technique scales the image so that it fills the
+   * requested bounds and then crops the extra.
+   */
+  public RequestCreator centerCrop() {
+    data.centerCrop();
+    return this;
+  }
 
   /**
    * Centers an image inside of the bounds specified by {@link #resize(int, int)}. This scales
@@ -188,7 +217,12 @@ public class RequestCreator {
     return this;
   }
 
-  /** Decode the image using the specified config. */
+  /**
+   * Attempt to decode the image using the specified config.
+   * <p>
+   * Note: This value may be ignored by {@link BitmapFactory}. See
+   * {@link BitmapFactory.Options#inPreferredConfig its documentation} for more details.
+   */
   public RequestCreator config(Bitmap.Config config) {
     data.config(config);
     return this;
@@ -196,7 +230,7 @@ public class RequestCreator {
 
   /**
    * Add a custom transformation to be applied to the image.
-   * <p/>
+   * <p>
    * Custom transformations will always be run after the built-in transformations.
    */
   // TODO show example of calling resize after a transform in the javadoc
@@ -221,9 +255,16 @@ public class RequestCreator {
     return this;
   }
 
-  /** Synchronously fulfill this request. Must not be called from the main thread. */
+  /**
+   * Synchronously fulfill this request. Must not be called from the main thread.
+   * <p>
+   * <em>Note</em>: The result of this operation is not cached in memory because the underlying
+   * {@link Cache} implementation is not guaranteed to be thread-safe.
+   */
   public Bitmap get() throws IOException {
+    long started = System.nanoTime();
     checkNotMain();
+
     if (deferred) {
       throw new IllegalStateException("Fit cannot be used with get.");
     }
@@ -231,7 +272,7 @@ public class RequestCreator {
       return null;
     }
 
-    Request finalData = picasso.transformRequest(data.build());
+    Request finalData = createRequest(started);
     String key = createKey(finalData, new StringBuilder());
 
     Action action = new GetAction(picasso, finalData, skipMemoryCache, key);
@@ -242,17 +283,21 @@ public class RequestCreator {
   /**
    * Asynchronously fulfills the request without a {@link ImageView} or {@link Target}. This is
    * useful when you want to warm up the cache with an image.
+   * <p>
+   * <em>Note:</em> It is safe to invoke this method from any thread.
    */
   public void fetch() {
+    long started = System.nanoTime();
+
     if (deferred) {
       throw new IllegalStateException("Fit cannot be used with fetch.");
     }
     if (data.hasImage()) {
-      Request finalData = picasso.transformRequest(data.build());
-      String key = createKey(finalData);
+      Request request = createRequest(started);
+      String key = createKey(request, new StringBuilder());
 
-      Action action = new FetchAction(picasso, finalData, skipMemoryCache, key);
-      picasso.enqueueAndSubmit(action);
+      Action action = new FetchAction(picasso, request, skipMemoryCache, key);
+      picasso.submit(action);
     }
   }
 
@@ -271,6 +316,10 @@ public class RequestCreator {
    *   {@literal @}Override public void onBitmapFailed() {
    *     setBackgroundResource(R.drawable.profile_error);
    *   }
+   *
+   *   {@literal @}Override public void onPrepareLoad(Drawable placeHolderDrawable) {
+   *     frame.setBackgroundDrawable(placeHolderDrawable);
+   *   }
    * }
    * </pre></blockquote>
    * Implementing on a view holder object for use inside of an adapter:
@@ -286,6 +335,10 @@ public class RequestCreator {
    *   {@literal @}Override public void onBitmapFailed() {
    *     frame.setBackgroundResource(R.drawable.profile_error);
    *   }
+   *
+   *   {@literal @}Override public void onPrepareLoad(Drawable placeHolderDrawable) {
+   *     frame.setBackgroundDrawable(placeHolderDrawable);
+   *   }
    * }
    * </pre></blockquote>
    * <p>
@@ -294,6 +347,9 @@ public class RequestCreator {
    * image is loaded use {@link #into(android.widget.ImageView, Callback)}.
    */
   public void into(Target target) {
+    long started = System.nanoTime();
+    checkMain();
+
     if (target == null) {
       throw new IllegalArgumentException("Target must not be null.");
     }
@@ -311,8 +367,8 @@ public class RequestCreator {
       return;
     }
 
-    Request finalData = picasso.transformRequest(data.build());
-    String requestKey = createKey(finalData);
+    Request request = createRequest(started);
+    String requestKey = createKey(request);
 
     if (!skipMemoryCache) {
       Bitmap bitmap = picasso.quickMemoryCacheCheck(requestKey);
@@ -325,13 +381,80 @@ public class RequestCreator {
 
     target.onPrepareLoad(drawable);
 
-    Action action = new TargetAction(picasso, target, finalData, skipMemoryCache, requestKey);
+    Action action =
+        new TargetAction(picasso, target, request, skipMemoryCache, errorResId, errorDrawable,
+            requestKey);
     picasso.enqueueAndSubmit(action);
   }
 
   /**
+   * Asynchronously fulfills the request into the specified {@link RemoteViews} object with the
+   * given {@code viewId}. This is used for loading bitmaps into a {@link Notification}.
+   */
+  public void into(RemoteViews remoteViews, int viewId, int notificationId,
+      Notification notification) {
+    long started = System.nanoTime();
+    checkMain();
+
+    if (remoteViews == null) {
+      throw new IllegalArgumentException("RemoteViews must not be null.");
+    }
+    if (notification == null) {
+      throw new IllegalArgumentException("Notification must not be null.");
+    }
+    if (deferred) {
+      throw new IllegalStateException("Fit cannot be used with RemoteViews.");
+    }
+    if (placeholderDrawable != null || errorDrawable != null) {
+      throw new IllegalArgumentException(
+          "Cannot use placeholder or error drawables with remote views.");
+    }
+
+    Request request = createRequest(started);
+    String key = createKey(request);
+
+    RemoteViewsAction action =
+        new NotificationAction(picasso, request, remoteViews, viewId, notificationId, notification,
+            skipMemoryCache, errorResId, key);
+
+    performRemoteViewInto(action);
+  }
+
+  /**
+   * Asynchronously fulfills the request into the specified {@link RemoteViews} object with the
+   * given {@code viewId}. This is used for loading bitmaps into all instances of a widget.
+   */
+  public void into(RemoteViews remoteViews, int viewId, int[] appWidgetIds) {
+    long started = System.nanoTime();
+    checkMain();
+
+    if (remoteViews == null) {
+      throw new IllegalArgumentException("remoteViews must not be null.");
+    }
+    if (appWidgetIds == null) {
+      throw new IllegalArgumentException("appWidgetIds must not be null.");
+    }
+    if (deferred) {
+      throw new IllegalStateException("Fit cannot be used with remote views.");
+    }
+    if (placeholderDrawable != null || errorDrawable != null) {
+      throw new IllegalArgumentException(
+          "Cannot use placeholder or error drawables with remote views.");
+    }
+
+    Request request = createRequest(started);
+    String key = createKey(request);
+
+    RemoteViewsAction action =
+        new AppWidgetAction(picasso, request, remoteViews, viewId, appWidgetIds, skipMemoryCache,
+            errorResId, key);
+
+    performRemoteViewInto(action);
+  }
+
+  /**
    * Asynchronously fulfills the request into the specified {@link ImageView}.
-   * <p/>
+   * <p>
    * <em>Note:</em> This method keeps a weak reference to the {@link ImageView} instance and will
    * automatically support object recycling.
    */
@@ -342,20 +465,23 @@ public class RequestCreator {
   /**
    * Asynchronously fulfills the request into the specified {@link ImageView} and invokes the
    * target {@link Callback} if it's not {@code null}.
-   * <p/>
+   * <p>
    * <em>Note:</em> The {@link Callback} param is a strong reference and will prevent your
    * {@link android.app.Activity} or {@link android.app.Fragment} from being garbage collected. If
    * you use this method, it is <b>strongly</b> recommended you invoke an adjacent
    * {@link Picasso#cancelRequest(android.widget.ImageView)} call to prevent temporary leaking.
    */
   public void into(ImageView target, Callback callback) {
+    long started = System.nanoTime();
+    checkMain();
+
     if (target == null) {
       throw new IllegalArgumentException("Target must not be null.");
     }
 
     if (!data.hasImage()) {
       picasso.cancelRequest(target);
-      PicassoDrawable.setPlaceholder(target, placeholderResId, placeholderDrawable);
+      setPlaceholder(target, placeholderResId, placeholderDrawable);
       return;
     }
 
@@ -363,25 +489,27 @@ public class RequestCreator {
       if (data.hasSize()) {
         throw new IllegalStateException("Fit cannot be used with resize.");
       }
-      int measuredWidth = target.getMeasuredWidth();
-      int measuredHeight = target.getMeasuredHeight();
-      if (measuredWidth == 0 || measuredHeight == 0) {
-        PicassoDrawable.setPlaceholder(target, placeholderResId, placeholderDrawable);
+      int width = target.getWidth();
+      int height = target.getHeight();
+      if (width == 0 || height == 0) {
+        setPlaceholder(target, placeholderResId, placeholderDrawable);
         picasso.defer(target, new DeferredRequestCreator(this, target, callback));
         return;
       }
-      data.resize(measuredWidth, measuredHeight);
+      data.resize(width, height);
     }
 
-    Request finalData = picasso.transformRequest(data.build());
-    String requestKey = createKey(finalData);
+    Request request = createRequest(started);
+    String requestKey = createKey(request);
 
     if (!skipMemoryCache) {
       Bitmap bitmap = picasso.quickMemoryCacheCheck(requestKey);
       if (bitmap != null) {
         picasso.cancelRequest(target);
-        PicassoDrawable.setBitmap(target, picasso.context, bitmap, MEMORY, noFade,
-            picasso.debugging);
+        setBitmap(target, picasso.context, bitmap, MEMORY, noFade, picasso.indicatorsEnabled);
+        if (picasso.loggingEnabled) {
+          log(OWNER_MAIN, VERB_COMPLETED, request.plainId(), "from " + MEMORY);
+        }
         if (callback != null) {
           callback.onSuccess();
         }
@@ -389,11 +517,54 @@ public class RequestCreator {
       }
     }
 
-    PicassoDrawable.setPlaceholder(target, placeholderResId, placeholderDrawable);
+    setPlaceholder(target, placeholderResId, placeholderDrawable);
 
     Action action =
-        new ImageViewAction(picasso, target, finalData, skipMemoryCache, noFade, errorResId,
+        new ImageViewAction(picasso, target, request, skipMemoryCache, noFade, errorResId,
             errorDrawable, requestKey, callback);
+
+    picasso.enqueueAndSubmit(action);
+  }
+
+  /** Create the request optionally passing it through the request transformer. */
+  private Request createRequest(long started) {
+    int id = getRequestId();
+
+    Request request = data.build();
+    request.id = id;
+    request.started = started;
+
+    boolean loggingEnabled = picasso.loggingEnabled;
+    if (loggingEnabled) {
+      log(OWNER_MAIN, VERB_CREATED, request.plainId(), request.toString());
+    }
+
+    Request transformed = picasso.transformRequest(request);
+    if (transformed != request) {
+      // If the request was changed, copy over the id and timestamp from the original.
+      transformed.id = id;
+      transformed.started = started;
+
+      if (loggingEnabled) {
+        log(OWNER_MAIN, VERB_CHANGED, transformed.logId(), "into " + transformed);
+      }
+    }
+
+    return transformed;
+  }
+
+  private void performRemoteViewInto(RemoteViewsAction action) {
+    if (!skipMemoryCache) {
+      Bitmap bitmap = picasso.quickMemoryCacheCheck(action.getKey());
+      if (bitmap != null) {
+        action.complete(bitmap, MEMORY);
+        return;
+      }
+    }
+
+    if (placeholderResId != 0) {
+      action.setImageResource(placeholderResId);
+    }
 
     picasso.enqueueAndSubmit(action);
   }
