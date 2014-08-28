@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.ViewAnimator;
+
 import com.squareup.picasso.Picasso;
 
 import static android.content.Intent.ACTION_PICK;

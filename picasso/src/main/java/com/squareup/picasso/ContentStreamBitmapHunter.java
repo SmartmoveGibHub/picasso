@@ -19,6 +19,7 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+
 import java.io.IOException;
 import java.io.InputStream;
 

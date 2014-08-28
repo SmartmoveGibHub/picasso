@@ -1,6 +1,7 @@
 package com.squareup.picasso.pollexor;
 
 import android.net.Uri;
+
 import com.squareup.picasso.Request;
 import com.squareup.pollexor.Pollexor;
 

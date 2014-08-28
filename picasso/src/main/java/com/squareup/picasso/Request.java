@@ -17,6 +17,7 @@ package com.squareup.picasso;
 
 import android.graphics.Bitmap;
 import android.net.Uri;
+
 import java.util.ArrayList;
 import java.util.List;
 
