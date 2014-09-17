@@ -24,7 +24,6 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.Process;
 import android.widget.ImageView;
-
 import java.io.File;
 import java.lang.ref.ReferenceQueue;
 import java.util.List;

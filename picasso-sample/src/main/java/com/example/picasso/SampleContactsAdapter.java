@@ -25,7 +25,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.QuickContactBadge;
 import android.widget.TextView;
-
 import com.squareup.picasso.Picasso;
 
 import static android.provider.ContactsContract.Contacts;

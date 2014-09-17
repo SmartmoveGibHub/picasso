@@ -16,7 +16,6 @@
 package com.squareup.picasso;
 
 import android.util.Log;
-
 import java.io.PrintWriter;
 import java.io.StringWriter;
 

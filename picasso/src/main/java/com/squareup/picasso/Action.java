@@ -17,7 +17,6 @@ package com.squareup.picasso;
 
 import android.graphics.Bitmap;
 import android.graphics.drawable.Drawable;
-
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 
